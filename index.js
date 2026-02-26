@@ -1,58 +1,45 @@
 /**
- * 初始化 Silence Player 插件
- * 在页面中添加音频播放器 UI，并尝试后台自动播放静音音频
+ * 初始化静默播放器扩展
+ * 该扩展在设置面板中添加一个音频播放器，循环播放静音文件以保持音频活动
  */
 jQuery(() => {
-    /**
-     * 获取插件注入的容器
-     * @returns {jQuery} 返回 jQuery 包装的 DOM 元素
-     */
     const getContainer = () => $(document.getElementById('silence_container') ?? document.getElementById('extensions_settings'));
+    
+    const audioHtml = `
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>Silence Player</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <audio id="silence_player_audio" autoplay loop controls src="/scripts/extensions/third-party/Extension-Silence/silence.m4a" style="width: 100%;">
+            </audio>
+        </div>
+    </div>`;
+
+    getContainer().append(audioHtml);
+
+    const audio = document.getElementById('silence_player_audio');
 
     /**
-     * 创建并注入 UI 面板
+     * 尝试启动音频播放
+     * 用于绕过浏览器对自动播放的限制
      */
-    const injectUI = () => {
-        const html = `
-        <div class="inline-drawer">
-            <div class="inline-drawer-toggle inline-drawer-header">
-                <b>Silence Player</b>
-                <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
-            </div>
-            <div class="inline-drawer-content">
-                <audio id="silence_player_audio" autoplay loop controls src="/scripts/extensions/third-party/Extension-Silence/silence.m4a" style="width: 100%;">
-            </div>
-        </div>`;
-        getContainer().append(html);
-    };
-
-    /**
-     * 尝试自动播放音频
-     * 处理浏览器自动播放策略限制
-     */
-    const startAutoplay = () => {
-        const audio = document.getElementById('silence_player_audio');
-        if (!audio) return;
-
-        // 尝试播放
-        const playPromise = audio.play();
-
-        if (playPromise !== undefined) {
-            playPromise.catch(() => {
-                // 如果自动播放被拦截，监听首次交互后播放
-                console.log('Silence Player: Autoplay blocked, waiting for interaction.');
-                const playOnInteraction = () => {
-                    audio.play();
-                    document.removeEventListener('click', playOnInteraction);
-                    document.removeEventListener('keydown', playOnInteraction);
-                };
-                document.addEventListener('click', playOnInteraction);
-                document.addEventListener('keydown', playOnInteraction);
+    const startAudio = () => {
+        if (audio && audio.paused) {
+            audio.play().then(() => {
+                console.log('Silence Player: 自动播放成功');
+                // 成功播放后移除监听器
+                document.removeEventListener('click', startAudio);
+                document.removeEventListener('keydown', startAudio);
+            }).catch(err => {
+                // 仍然被拦截，等待下次交互
+                console.debug('Silence Player: 等待用户交互以启动播放');
             });
         }
     };
 
-    // 执行初始化
-    injectUI();
-    startAutoplay();
+    // 监听首次交互以确保自动播放
+    document.addEventListener('click', startAudio);
+    document.addEventListener('keydown', startAudio);
 });
