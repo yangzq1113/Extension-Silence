@@ -1,70 +1,51 @@
-/**
- * 获取静音播放器的挂载容器
- */
-const getSilenceContainer = () => $(document.getElementById('silence_container') ?? document.getElementById('extensions_settings'));
+jQuery(() => {
+    /**
+     * 获取插件容器，优先查找特定的容器，否则使用扩展设置容器
+     * @returns {jQuery} 容器对象
+     */
+    const getContainer = () => $(document.getElementById('silence_container') ?? document.getElementById('extensions_settings'));
 
-/**
- * 初始化静音播放器 UI
- */
-const initSilencePlayer = () => {
-    const container = getSilenceContainer();
-    container.append(`
+    // 注入 UI
+    getContainer().append(`
     <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
             <b>Silence Player</b>
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
         <div class="inline-drawer-content">
-            <audio id="silence_player_audio" autoplay loop controls src="/scripts/extensions/third-party/Extension-Silence/silence.m4a"></audio>
+            <audio id="silence_player_audio" autoplay loop controls src="/scripts/extensions/third-party/Extension-Silence/silence.m4a" style="width: 100%;">
         </div>
     </div>`);
-};
 
-/**
- * 绑定自动播放逻辑，尽量在无需点击播放按钮的前提下开始播放
- */
-const bindSilenceAutoPlay = () => {
-    const audioElement = document.getElementById('silence_player_audio');
-    if (!audioElement) {
-        return;
-    }
+    const audio = document.getElementById('silence_player_audio');
 
-    const events = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
-
-    const cleanup = () => {
-        events.forEach(eventName => window.removeEventListener(eventName, handleUserGesture));
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-
-    const tryPlay = () => {
-        const playResult = audioElement.play();
-        if (playResult && typeof playResult.then === 'function') {
-            playResult.then(() => {
-                cleanup();
-            }).catch(() => {
-            });
-        } else {
-            cleanup();
+    /**
+     * 尝试播放音频并处理可能的自动播放限制
+     */
+    const startPlayback = async () => {
+        try {
+            if (audio.paused) {
+                await audio.play();
+                console.log('Silence Player: Autoplay started successfully.');
+            }
+        } catch (err) {
+            console.warn('Silence Player: Autoplay blocked. Waiting for user interaction...', err);
         }
     };
 
-    const handleUserGesture = () => {
-        tryPlay();
-    };
+    // 页面加载后立即尝试播放
+    startPlayback();
 
-    const handleVisibilityChange = () => {
-        if (!document.hidden) {
-            tryPlay();
+    // 监听全局交互以绕过浏览器对自动播放的限制
+    const handleInteraction = () => {
+        startPlayback();
+        // 成功播放后移除监听器，避免重复执行
+        if (!audio.paused) {
+            document.removeEventListener('click', handleInteraction);
+            document.removeEventListener('touchstart', handleInteraction);
         }
     };
 
-    events.forEach(eventName => window.addEventListener(eventName, handleUserGesture));
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    tryPlay();
-};
-
-jQuery(() => {
-    initSilencePlayer();
-    bindSilenceAutoPlay();
+    document.addEventListener('click', handleInteraction);
+    document.addEventListener('touchstart', handleInteraction);
 });
