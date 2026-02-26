@@ -1,119 +1,65 @@
 /**
- * 音频播放器类，处理自动播放逻辑和浏览器限制
+ * 初始化 Silence Player 扩展
+ * 该函数会在文档就绪后运行，将音频播放器添加到指定的容器中，并尝试自动播放。
  */
-class SilencePlayer {
-    /**
-     * @param {string} src 音频源地址
-     */
-    constructor(src) {
-        this.src = src;
-        this.audio = new Audio(this.src);
-        this.audio.loop = true;
-        // 关键：静音播放通常被浏览器允许自动播放
-        this.audio.muted = true;
-        this.isInitialized = false;
-
-        this.init();
-    }
-
-    /**
-     * 初始化播放器
-     */
-    async init() {
-        try {
-            await this.audio.play();
-            console.log('Silence Player: 自动静音播放成功');
-            this.isInitialized = true;
-        } catch (error) {
-            console.warn('Silence Player: 自动播放被拦截，等待用户交互...', error);
-        }
-        
-        // 无论是否成功，都监听交互以尝试解除静音或重新播放
-        this.setupInteractionListeners();
-    }
-
-    /**
-     * 设置用户交互监听器，用于解除自动播放限制或取消静音
-     */
-    setupInteractionListeners() {
-        const unlock = async () => {
-            try {
-                // 用户点击后，尝试取消静音并播放
-                this.audio.muted = false;
-                await this.audio.play();
-                console.log('Silence Player: 交互后播放成功（已取消静音）');
-                this.isInitialized = true;
-                this.removeInteractionListeners(unlock);
-            } catch (error) {
-                console.error('Silence Player: 交互后播放失败', error);
-            }
-        };
-
-        window.addEventListener('click', unlock, { once: true });
-        window.addEventListener('touchstart', unlock, { once: true });
-        window.addEventListener('keydown', unlock, { once: true });
-    }
-
-    /**
-     * 移除交互监听器
-     * @param {Function} callback 
-     */
-    removeInteractionListeners(callback) {
-        window.removeEventListener('click', callback);
-        window.removeEventListener('touchstart', callback);
-        window.removeEventListener('keydown', callback);
-    }
-}
-
 jQuery(() => {
-    const audioSrc = "/scripts/extensions/third-party/Extension-Silence/silence.m4a";
-    const player = new SilencePlayer(audioSrc);
-
     /**
-     * 获取容器
-     * @returns {jQuery}
+     * 获取要插入播放器的目标容器
+     * @returns {jQuery} 包含目标元素的 jQuery 对象
      */
     const getContainer = () => $(document.getElementById('silence_container') ?? document.getElementById('extensions_settings'));
     
-    // 渲染 UI
-    getContainer().append(`
+    // 生成音频播放器的 HTML 结构
+    const audioHtml = `
     <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
             <b>Silence Player</b>
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
         <div class="inline-drawer-content">
-            <div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
-                <div id="silence-status" style="font-size: 0.9em; color: var(--grey);">状态: 初始化中...</div>
-                <div id="silence-audio-container"></div>
-            </div>
+            <audio id="silence-player-audio" autoplay loop controls src="/scripts/extensions/third-party/Extension-Silence/silence.m4a" >
         </div>
-    </div>`);
-
-    const $status = $('#silence-status');
-    const nativeAudio = player.audio;
-
-    // 将原生的 audio 对象插入 DOM 以显示控件
-    nativeAudio.controls = true;
-    nativeAudio.style.width = '100%';
-    nativeAudio.id = 'silence-audio-element';
-    $('#silence-audio-container').append(nativeAudio);
+    </div>`;
     
-    // 同步状态
-    const syncUI = () => {
-        if (nativeAudio.paused) {
-            $status.text('状态: 已暂停 (点击页面任何地方以激活)');
-            $status.css('color', 'var(--red)');
-        } else {
-            $status.text(nativeAudio.muted ? '状态: 正在自动播放 (静音模式)' : '状态: 正在播放');
-            $status.css('color', 'var(--green)');
+    // 将播放器添加到页面
+    getContainer().append(audioHtml);
+
+    /**
+     * 尝试启动音频播放
+     * 处理浏览器的自动播放限制，并在失败时监听用户交互以再次尝试。
+     */
+    const tryPlayAudio = async () => {
+        const audio = document.getElementById('silence-player-audio');
+        if (!audio) return;
+
+        try {
+            // 尝试直接播放
+            await audio.play();
+            console.log('Silence Player: 自动播放已成功启动。');
+        } catch (error) {
+            console.warn('Silence Player: 自动播放被浏览器拦截。等待用户交互后重试。', error);
+            
+            // 如果被拦截，则监听文档的首次交互事件以启动播放
+            const startOnInteraction = async () => {
+                try {
+                    await audio.play();
+                    console.log('Silence Player: 用户交互后成功启动播放。');
+                    // 移除监听器
+                    ['click', 'keydown', 'touchstart', 'mousedown'].forEach(event => {
+                        document.removeEventListener(event, startOnInteraction);
+                    });
+                } catch (e) {
+                    console.error('Silence Player: 交互后播放仍然失败:', e);
+                }
+            };
+
+            // 添加多种可能的交互事件监听器
+            ['click', 'keydown', 'touchstart', 'mousedown'].forEach(event => {
+                document.addEventListener(event, startOnInteraction, { once: true });
+            });
         }
     };
 
-    nativeAudio.onplay = syncUI;
-    nativeAudio.onpause = syncUI;
-    nativeAudio.onvolumechange = syncUI;
-
-    // 初始同步
-    syncUI();
+    // 延迟一小段时间以确保 DOM 已完全渲染并可以被脚本操作
+    setTimeout(tryPlayAudio, 500);
 });
