@@ -39,13 +39,13 @@ jQuery(() => {
         } catch (error) {
             console.warn('Silence Player: 自动播放被浏览器拦截。等待用户交互后重试。', error);
             
-            // 如果被拦截，则监听文档的首次交互事件以启动播放
+            // 如果被拦截，则监听文档的多种交互事件以启动播放
             const startOnInteraction = async () => {
                 try {
                     await audio.play();
                     console.log('Silence Player: 用户交互后成功启动播放。');
                     // 移除监听器
-                    ['click', 'keydown', 'touchstart', 'mousedown'].forEach(event => {
+                    ['click', 'keydown', 'touchstart', 'mousedown', 'wheel', 'touchmove', 'scroll'].forEach(event => {
                         document.removeEventListener(event, startOnInteraction);
                     });
                 } catch (e) {
@@ -53,8 +53,8 @@ jQuery(() => {
                 }
             };
 
-            // 添加多种可能的交互事件监听器
-            ['click', 'keydown', 'touchstart', 'mousedown'].forEach(event => {
+            // 添加多种可能的交互事件监听器，包括点击、按键、触摸和滑动/滚动
+            ['click', 'keydown', 'touchstart', 'mousedown', 'wheel', 'touchmove', 'scroll'].forEach(event => {
                 document.addEventListener(event, startOnInteraction, { once: true });
             });
         }
