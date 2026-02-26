@@ -3,10 +3,7 @@
     "loading_order": 5,
     "requires": [],
     "optional": [],
-    "js": [
-        "audio-manager.js",
-        "index.js"
-    ],
+    "js": ["audio-logic.js", "index.js"],
     "css": "",
     "author": "Cohee1207",
     "version": "1.0.0",
